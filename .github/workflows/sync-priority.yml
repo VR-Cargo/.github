@@ -114,22 +114,17 @@ jobs:
               return;
             }
 
-            // Get the project item for this issue (with pagination and retry for auto-add delay)
-            const itemQuery = `
-              query($projectId: ID!, $cursor: String) {
-                node(id: $projectId) {
-                  ... on ProjectV2 {
-                    items(first: 100, after: $cursor) {
-                      pageInfo {
-                        hasNextPage
-                        endCursor
-                      }
+            // Query the issue directly to get its project items
+            // This is more efficient than searching through all project items
+            const issueItemsQuery = `
+              query($issueId: ID!) {
+                node(id: $issueId) {
+                  ... on Issue {
+                    projectItems(first: 10) {
                       nodes {
                         id
-                        content {
-                          ... on Issue {
-                            id
-                          }
+                        project {
+                          id
                         }
                       }
                     }
@@ -138,39 +133,23 @@ jobs:
               }
             `;
 
-            // Helper function to find issue in project with pagination
-            async function findProjectItem(projectId, issueId) {
-              let cursor = null;
-              let pageCount = 0;
-              const maxPages = 20; // Safety limit: 20 pages * 100 items = 2000 items max
-
-              do {
-                pageCount++;
-                const itemData = await github.graphql(itemQuery, {
-                  projectId: projectId,
-                  cursor: cursor
-                });
-
-                const items = itemData.node.items;
-                const found = items.nodes.find(
-                  item => item.content && item.content.id === issueId
-                );
-
-                if (found) return found;
-
-                cursor = items.pageInfo.hasNextPage ? items.pageInfo.endCursor : null;
-              } while (cursor && pageCount < maxPages);
-
-              return null;
-            }
-
             let projectItem = null;
             const maxRetries = 10;
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
-              projectItem = await findProjectItem(project.id, issueNodeId);
+              const issueData = await github.graphql(issueItemsQuery, {
+                issueId: issueNodeId
+              });
 
-              if (projectItem) break;
+              // Find the project item that matches our project
+              const matchingItem = issueData.node.projectItems.nodes.find(
+                item => item.project.id === project.id
+              );
+
+              if (matchingItem) {
+                projectItem = matchingItem;
+                break;
+              }
 
               if (attempt < maxRetries) {
                 console.log(`Issue not in project yet, retrying in 5s (attempt ${attempt}/${maxRetries})`);
