@@ -12,7 +12,7 @@ on:
         required: true
         type: string
     secrets:
-      PROJECT_TOKEN:
+      CLAUDE_CODE_GITHUB_ACTIONS:
         description: 'GitHub token with project write permissions'
         required: true
 
@@ -64,7 +64,7 @@ jobs:
         if: steps.parse.outputs.priority != ''
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.PROJECT_TOKEN }}
+          github-token: ${{ secrets.CLAUDE_CODE_GITHUB_ACTIONS }}
           script: |
             const priority = '${{ steps.parse.outputs.priority }}';
             const issueNodeId = `${{ inputs.issue_node_id }}`;
