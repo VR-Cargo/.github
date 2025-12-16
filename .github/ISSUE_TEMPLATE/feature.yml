@@ -16,9 +16,9 @@ body:
     attributes:
       label: Priority
       options:
-        - P0 - Critical
+        - P0 - Normal
         - P1 - High
-        - P2 - Normal
+        - P2 - Critical
     validations:
       required: true
   - type: textarea

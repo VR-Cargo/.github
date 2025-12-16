@@ -1,0 +1,199 @@
+name: Sync Issue Priority to Project
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  sync-priority:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse Priority from Issue Body
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+
+            // Parse feature template priority
+            // NOTE: Priority scale is inverted intentionally per team preference:
+            // P0 = Normal (default/lowest), P1 = High, P2 = Critical (highest)
+            const featurePriorityMatch = body.match(/### Priority\s*\n\s*(P[0-2]\s*-\s*\w+)/i);
+
+            // Parse bug template severity
+            const severityMatch = body.match(/### Severity\s*\n\s*(Critical|High|Medium|Low)/i);
+
+            let priority = null;
+
+            if (featurePriorityMatch) {
+              const priorityText = featurePriorityMatch[1].toLowerCase();
+              // P0 = Normal, P1 = High, P2 = Critical
+              if (priorityText.includes('p0')) priority = 'P0';
+              else if (priorityText.includes('p1')) priority = 'P1';
+              else if (priorityText.includes('p2')) priority = 'P2';
+            } else if (severityMatch) {
+              const severity = severityMatch[1].toLowerCase();
+              // Map bug severity to project priority
+              // Low/Medium → P0 (Normal), High → P1, Critical → P2
+              if (severity === 'low' || severity === 'medium') priority = 'P0';
+              else if (severity === 'high') priority = 'P1';
+              else if (severity === 'critical') priority = 'P2';
+            }
+
+            console.log(`Parsed priority: ${priority}`);
+            core.setOutput('priority', priority || '');
+            return priority;
+
+      - name: Wait for Project Auto-Add
+        if: steps.parse.outputs.priority != ''
+        run: sleep 5
+
+      - name: Update Project Priority
+        if: steps.parse.outputs.priority != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const priority = '${{ steps.parse.outputs.priority }}';
+            const issueNodeId = context.payload.issue.node_id;
+
+            // Get the project and field info
+            // VR-Cargo MVP Project number is 1
+            const projectQuery = `
+              query($org: String!, $number: Int!) {
+                organization(login: $org) {
+                  projectV2(number: $number) {
+                    id
+                    field(name: "Priority") {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const projectData = await github.graphql(projectQuery, {
+              org: 'VR-Cargo',
+              number: 1
+            });
+
+            const project = projectData.organization.projectV2;
+            const priorityField = project.field;
+
+            if (!priorityField || !priorityField.options) {
+              console.log('Priority field not found or not a single-select field');
+              return;
+            }
+
+            // Find the option ID for the parsed priority
+            const option = priorityField.options.find(opt =>
+              opt.name.toUpperCase().startsWith(priority)
+            );
+
+            if (!option) {
+              console.log(`Priority option ${priority} not found in project field`);
+              console.log('Available options:', priorityField.options.map(o => o.name));
+              return;
+            }
+
+            // Get the project item for this issue (with pagination and retry for auto-add delay)
+            const itemQuery = `
+              query($projectId: ID!, $cursor: String) {
+                node(id: $projectId) {
+                  ... on ProjectV2 {
+                    items(first: 100, after: $cursor) {
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
+                      nodes {
+                        id
+                        content {
+                          ... on Issue {
+                            id
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            // Helper function to find issue in project with pagination
+            async function findProjectItem(projectId, issueId) {
+              let cursor = null;
+              let pageCount = 0;
+              const maxPages = 20; // Safety limit: 20 pages * 100 items = 2000 items max
+
+              do {
+                pageCount++;
+                const itemData = await github.graphql(itemQuery, {
+                  projectId: projectId,
+                  cursor: cursor
+                });
+
+                const items = itemData.node.items;
+                const found = items.nodes.find(
+                  item => item.content && item.content.id === issueId
+                );
+
+                if (found) return found;
+
+                cursor = items.pageInfo.hasNextPage ? items.pageInfo.endCursor : null;
+              } while (cursor && pageCount < maxPages);
+
+              return null;
+            }
+
+            let projectItem = null;
+            const maxRetries = 3;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              projectItem = await findProjectItem(project.id, issueNodeId);
+
+              if (projectItem) break;
+
+              if (attempt < maxRetries) {
+                console.log(`Issue not in project yet, retrying in 5s (attempt ${attempt}/${maxRetries})`);
+                await new Promise(r => setTimeout(r, 5000));
+              }
+            }
+
+            if (!projectItem) {
+              console.log('Issue not found in project after retries');
+              return;
+            }
+
+            // Update the priority field
+            const updateMutation = `
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }
+                ) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }
+            `;
+
+            await github.graphql(updateMutation, {
+              projectId: project.id,
+              itemId: projectItem.id,
+              fieldId: priorityField.id,
+              optionId: option.id
+            });
+
+            console.log(`Successfully set priority to ${priority} (${option.name})`);
