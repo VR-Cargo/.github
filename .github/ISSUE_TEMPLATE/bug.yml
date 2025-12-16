@@ -1,0 +1,53 @@
+name: Bug Report
+description: Report a production bug
+title: "[Bug]: "
+labels: ["bug"]
+projects: ["VR-Cargo/1"]
+body:
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical (system down)
+        - High (major feature broken)
+        - Medium (workaround exists)
+        - Low (minor issue)
+    validations:
+      required: true
+  - type: dropdown
+    id: project
+    attributes:
+      label: Affected Project
+      options:
+        - Newton (Web)
+        - NewtonWeighbridges (Mobile)
+        - LoadPlanServer
+        - Multiple
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the bug
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs Actual Behavior
+      description: What should happen vs what actually happens
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, device, OS version, etc.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs
+      description: Any relevant error messages or stack traces
+      render: shell

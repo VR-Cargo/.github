@@ -1,0 +1,28 @@
+name: Feature Request
+description: Request a new feature
+title: "[Feature]: "
+labels: ["enhancement"]
+projects: ["VR-Cargo/1"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear description of the feature
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 - Critical
+        - P1 - High
+        - P2 - Normal
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How will we know this is done?
