@@ -178,9 +178,30 @@ jobs:
               }
             }
 
+            // If issue not found after retries, add it to the project
             if (!projectItem) {
-              console.log('Issue not found in project after retries');
-              return;
+              console.log('Issue not found in project after retries, adding it now...');
+
+              const addItemMutation = `
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: {
+                    projectId: $projectId
+                    contentId: $contentId
+                  }) {
+                    item {
+                      id
+                    }
+                  }
+                }
+              `;
+
+              const addResult = await github.graphql(addItemMutation, {
+                projectId: project.id,
+                contentId: issueNodeId
+              });
+
+              projectItem = { id: addResult.addProjectV2ItemById.item.id };
+              console.log('Issue added to project with item ID:', projectItem.id);
             }
 
             // Update the priority field
