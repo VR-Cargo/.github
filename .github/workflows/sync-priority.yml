@@ -86,8 +86,8 @@ jobs:
             const project = projectData.organization.projectV2;
             const priorityField = project.field;
 
-            if (!priorityField) {
-              console.log('Priority field not found in project');
+            if (!priorityField || !priorityField.options) {
+              console.log('Priority field not found or not a single-select field');
               return;
             }
 
