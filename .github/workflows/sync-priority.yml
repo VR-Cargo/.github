@@ -58,7 +58,7 @@ jobs:
 
       - name: Wait for Project Auto-Add
         if: steps.parse.outputs.priority != ''
-        run: sleep 10
+        run: sleep 15
 
       - name: Update Project Priority
         if: steps.parse.outputs.priority != ''
@@ -165,7 +165,7 @@ jobs:
             }
 
             let projectItem = null;
-            const maxRetries = 5;
+            const maxRetries = 10;
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
               projectItem = await findProjectItem(project.id, issueNodeId);
@@ -178,30 +178,9 @@ jobs:
               }
             }
 
-            // If issue not found after retries, add it to the project
             if (!projectItem) {
-              console.log('Issue not found in project after retries, adding it now...');
-
-              const addItemMutation = `
-                mutation($projectId: ID!, $contentId: ID!) {
-                  addProjectV2ItemById(input: {
-                    projectId: $projectId
-                    contentId: $contentId
-                  }) {
-                    item {
-                      id
-                    }
-                  }
-                }
-              `;
-
-              const addResult = await github.graphql(addItemMutation, {
-                projectId: project.id,
-                contentId: issueNodeId
-              });
-
-              projectItem = { id: addResult.addProjectV2ItemById.item.id };
-              console.log('Issue added to project with item ID:', projectItem.id);
+              console.log('Issue not found in project after all retries. GitHub automation may be slow or disabled.');
+              return;
             }
 
             // Update the priority field
