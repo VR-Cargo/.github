@@ -15,7 +15,9 @@ jobs:
           script: |
             const body = context.payload.issue.body || '';
 
-            // Parse feature template priority (P0 - Critical, P1 - High, P2 - Normal)
+            // Parse feature template priority
+            // NOTE: Priority scale is inverted intentionally per team preference:
+            // P0 = Normal (default/lowest), P1 = High, P2 = Critical (highest)
             const featurePriorityMatch = body.match(/### Priority\s*\n\s*(P[0-2]\s*-\s*\w+)/i);
 
             // Parse bug template severity
@@ -100,12 +102,16 @@ jobs:
               return;
             }
 
-            // Get the project item for this issue (with retry for auto-add delay)
+            // Get the project item for this issue (with pagination and retry for auto-add delay)
             const itemQuery = `
-              query($projectId: ID!, $issueId: ID!) {
+              query($projectId: ID!, $cursor: String) {
                 node(id: $projectId) {
                   ... on ProjectV2 {
-                    items(first: 100) {
+                    items(first: 100, after: $cursor) {
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
                       nodes {
                         id
                         content {
@@ -120,18 +126,37 @@ jobs:
               }
             `;
 
+            // Helper function to find issue in project with pagination
+            async function findProjectItem(projectId, issueId) {
+              let cursor = null;
+              let pageCount = 0;
+              const maxPages = 20; // Safety limit: 20 pages * 100 items = 2000 items max
+
+              do {
+                pageCount++;
+                const itemData = await github.graphql(itemQuery, {
+                  projectId: projectId,
+                  cursor: cursor
+                });
+
+                const items = itemData.node.items;
+                const found = items.nodes.find(
+                  item => item.content && item.content.id === issueId
+                );
+
+                if (found) return found;
+
+                cursor = items.pageInfo.hasNextPage ? items.pageInfo.endCursor : null;
+              } while (cursor && pageCount < maxPages);
+
+              return null;
+            }
+
             let projectItem = null;
             const maxRetries = 3;
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
-              const itemData = await github.graphql(itemQuery, {
-                projectId: project.id,
-                issueId: issueNodeId
-              });
-
-              projectItem = itemData.node.items.nodes.find(
-                item => item.content && item.content.id === issueNodeId
-              );
+              projectItem = await findProjectItem(project.id, issueNodeId);
 
               if (projectItem) break;
 
