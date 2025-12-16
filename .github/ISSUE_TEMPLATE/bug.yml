@@ -9,10 +9,10 @@ body:
     attributes:
       label: Severity
       options:
-        - Critical (system down)
-        - High (major feature broken)
-        - Medium (workaround exists)
         - Low (minor issue)
+        - Medium (workaround exists)
+        - High (major feature broken)
+        - Critical (system down)
     validations:
       required: true
   - type: dropdown
@@ -20,9 +20,9 @@ body:
     attributes:
       label: Affected Project
       options:
-        - Newton (Web)
-        - NewtonWeighbridges (Mobile)
-        - LoadPlanServer
+        - loadplan_web (Web)
+        - loadplan_android (Mobile)
+        - loadplan_notifications_server
         - Multiple
     validations:
       required: true

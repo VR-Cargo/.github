@@ -25,15 +25,17 @@ jobs:
 
             if (featurePriorityMatch) {
               const priorityText = featurePriorityMatch[1].toLowerCase();
+              // P0 = Normal, P1 = High, P2 = Critical
               if (priorityText.includes('p0')) priority = 'P0';
               else if (priorityText.includes('p1')) priority = 'P1';
               else if (priorityText.includes('p2')) priority = 'P2';
             } else if (severityMatch) {
               const severity = severityMatch[1].toLowerCase();
               // Map bug severity to project priority
-              if (severity === 'critical') priority = 'P0';
+              // Low/Medium → P0 (Normal), High → P1, Critical → P2
+              if (severity === 'low' || severity === 'medium') priority = 'P0';
               else if (severity === 'high') priority = 'P1';
-              else if (severity === 'medium' || severity === 'low') priority = 'P2';
+              else if (severity === 'critical') priority = 'P2';
             }
 
             console.log(`Parsed priority: ${priority}`);
