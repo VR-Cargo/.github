@@ -1,0 +1,19 @@
+# Mirror this repo to kreolact organization
+# Triggers on every push to main branch
+
+name: Mirror to kreolact
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '**'
+
+jobs:
+  mirror:
+    uses: VR-Cargo/.github/.github/workflows/mirror-to-kreolact.yml@main
+    with:
+      target_repo: vr-cargo-github
+    secrets:
+      KREOLACT_MIRROR_PAT: ${{ secrets.KREOLACT_MIRROR_PAT }}
