@@ -1,0 +1,4 @@
+{
+  "name": "Mirror to kreolact",
+  "description": "Automatically mirror this repository to kreolact organization on every push"
+}

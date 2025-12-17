@@ -1,0 +1,42 @@
+# Reusable workflow to mirror a VR-Cargo repo to kreolact
+# Called by individual repos via workflow_call
+
+name: Mirror to kreolact
+
+on:
+  workflow_call:
+    inputs:
+      target_repo:
+        description: 'Target repo name in kreolact org (e.g., loadplan_web)'
+        required: true
+        type: string
+    secrets:
+      KREOLACT_MIRROR_PAT:
+        description: 'PAT with push access to kreolact repos'
+        required: true
+
+jobs:
+  mirror:
+    name: Mirror to kreolact/${{ inputs.target_repo }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Push mirror to kreolact
+        run: |
+          # Configure git
+          git config --global user.email "mirror@vr-cargo.com"
+          git config --global user.name "VR-Cargo Mirror"
+
+          # Add kreolact remote with PAT authentication
+          git remote add kreolact https://x-access-token:${{ secrets.KREOLACT_MIRROR_PAT }}@github.com/kreolact/${{ inputs.target_repo }}.git
+
+          # Push all branches and tags (mirror)
+          git push kreolact --all --force
+          git push kreolact --tags --force
+
+          echo "✅ Successfully mirrored to kreolact/${{ inputs.target_repo }}"
