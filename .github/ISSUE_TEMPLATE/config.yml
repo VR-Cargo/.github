@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Development Documentation
+    url: https://github.com/VR-Cargo/loadplan_web/blob/main/CLAUDE.md
+    about: Check out the development guide for more information
+  - name: Team Workflows
+    url: https://github.com/VR-Cargo/loadplan_web/blob/main/WORKFLOWS.md
+    about: View team workflows and processes

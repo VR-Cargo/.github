@@ -1,28 +1,98 @@
 name: Feature Request
-description: Request a new feature
+description: Request a new feature or enhancement
 title: "[Feature]: "
 labels: ["enhancement"]
 projects: ["VR-Cargo/1"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request
+        Please provide details about the feature you'd like to see implemented.
+
   - type: textarea
     id: description
     attributes:
       label: Description
-      description: Clear description of the feature
+      description: A clear and concise description of the feature
+      placeholder: Describe the feature you'd like to see...
     validations:
       required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe the problem this feature would solve
+      placeholder: As a [user type], I want to [action] so that [benefit]...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected-area
+    attributes:
+      label: Affected Area
+      description: Which area of the application does this affect?
+      multiple: true
+      options:
+        - Assets (trucks/trailers/drivers)
+        - Orders
+        - Pre-Bookings
+        - Transactions
+        - Weighbridge Operations
+        - Security Checkpoints
+        - Admin/Settings
+        - API
+        - UI/UX
+        - Notifications
+        - PDF Generation
+        - Authentication/Permissions
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: repository
+    attributes:
+      label: Affected Repository
+      description: Which repository/repositories does this affect?
+      multiple: true
+      options:
+        - LoadPlanWeb
+        - LoadPlanAndroid
+        - LoadPlanNotificationsServer
+    validations:
+      required: true
+
   - type: dropdown
     id: priority
     attributes:
       label: Priority
+      description: How important is this feature?
       options:
-        - P0 - Normal
-        - P1 - High
-        - P2 - Critical
+        - P0 - Normal (next sprint)
+        - P1 - High (same day)
+        - P2 - Critical (immediate)
     validations:
       required: true
+
   - type: textarea
-    id: acceptance
+    id: acceptance-criteria
     attributes:
       label: Acceptance Criteria
-      description: How will we know this is done?
+      description: What conditions must be met for this feature to be complete?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Criterion 3
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or mockups
+      placeholder: Add any other context here...
+    validations:
+      required: false

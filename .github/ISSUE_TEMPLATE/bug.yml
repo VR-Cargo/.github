@@ -1,53 +1,136 @@
 name: Bug Report
-description: Report a production bug
+description: Report a bug or issue
 title: "[Bug]: "
 labels: ["bug"]
 projects: ["VR-Cargo/1"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        Please provide as much detail as possible to help us investigate and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug
+      placeholder: Describe what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe what you expected to happen...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened...
+    validations:
+      required: true
+
   - type: dropdown
     id: severity
     attributes:
       label: Severity
+      description: How severe is this bug?
       options:
-        - Low (minor issue)
-        - Medium (workaround exists)
-        - High (major feature broken)
+        - Low (minor inconvenience)
+        - Medium (feature partially broken)
+        - High (feature completely broken)
         - Critical (system down)
     validations:
       required: true
+
   - type: dropdown
-    id: project
+    id: affected-area
     attributes:
-      label: Affected Project
+      label: Affected Area
+      description: Which area of the application does this affect?
+      multiple: true
       options:
-        - loadplan_web (Web)
-        - loadplan_android (Mobile)
-        - loadplan_notifications_server
-        - Multiple
+        - Assets (trucks/trailers/drivers)
+        - Orders
+        - Pre-Bookings
+        - Transactions
+        - Weighbridge Operations
+        - Security Checkpoints
+        - Admin/Settings
+        - API
+        - UI/UX
+        - Notifications
+        - PDF Generation
+        - Authentication/Permissions
+        - Other
     validations:
       required: true
-  - type: textarea
-    id: steps
+
+  - type: dropdown
+    id: repository
     attributes:
-      label: Steps to Reproduce
-      description: Step-by-step instructions to reproduce the bug
+      label: Affected Repository
+      description: Which repository/repositories does this affect?
+      multiple: true
+      options:
+        - LoadPlanWeb
+        - LoadPlanAndroid
+        - LoadPlanNotificationsServer
     validations:
       required: true
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected vs Actual Behavior
-      description: What should happen vs what actually happens
-    validations:
-      required: true
-  - type: textarea
+
+  - type: input
     id: environment
     attributes:
       label: Environment
-      description: Browser, device, OS version, etc.
-  - type: textarea
-    id: logs
+      description: Where did this occur?
+      placeholder: "e.g., Production, Staging, Development"
+    validations:
+      required: true
+
+  - type: input
+    id: browser-device
     attributes:
-      label: Error Logs
-      description: Any relevant error messages or stack traces
-      render: shell
+      label: Browser/Device
+      description: What browser or device were you using?
+      placeholder: "e.g., Chrome 120, Safari iOS 17, Android 14"
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots/Logs
+      description: Add screenshots or error logs if available
+      placeholder: Drag and drop images or paste error logs here...
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem
+      placeholder: Add any other context here...
+    validations:
+      required: false

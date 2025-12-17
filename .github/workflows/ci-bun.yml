@@ -1,0 +1,57 @@
+name: CI Build Check (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      build_command:
+        description: 'The build command to run (e.g., "bun run build")'
+        required: false
+        type: string
+        default: 'bun run build'
+      typecheck_command:
+        description: 'The typecheck command to run (optional)'
+        required: false
+        type: string
+        default: ''
+      lint_command:
+        description: 'The lint command to run (optional)'
+        required: false
+        type: string
+        default: ''
+      node_version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '20'
+
+jobs:
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type Check
+        if: inputs.typecheck_command != ''
+        run: ${{ inputs.typecheck_command }}
+
+      - name: Lint
+        if: inputs.lint_command != ''
+        run: ${{ inputs.lint_command }}
+
+      - name: Build
+        run: ${{ inputs.build_command }}
