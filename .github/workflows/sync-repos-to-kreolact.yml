@@ -1,13 +1,11 @@
-# Workflow refreshed
 # Automatically sync VR-Cargo repos to kreolact
-# - Creates missing repos in kreolact
+# - Creates missing repos in kreolact  
 # - Adds mirror.yml workflow to repos that don't have it
 
 name: Sync Repos to kreolact
 
 on:
   schedule:
-    # Run daily at 6 AM UTC
     - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
@@ -28,7 +26,6 @@ jobs:
         run: |
           echo "🔍 Checking VR-Cargo repos..."
           
-          # Get all VR-Cargo repos
           VR_CARGO_REPOS=$(gh repo list VR-Cargo --json name --jq '.[].name')
           
           CREATED_REPOS=""
@@ -36,123 +33,101 @@ jobs:
           SKIPPED_EMPTY=""
           
           for repo in $VR_CARGO_REPOS; do
-            # Skip .github repo (handled separately)
             if [ "$repo" = ".github" ]; then
               continue
             fi
             
             echo ""
             echo "📦 Processing $repo"
-            
-            # Determine target name in kreolact
             target="$repo"
             
-            # Check if kreolact repo exists
+            # Check/create kreolact repo
             if gh repo view "kreolact/$target" &>/dev/null; then
               echo "  ✅ kreolact/$target exists"
             else
               echo "  ⚠️  kreolact/$target does not exist"
-              
               if [ "${{ inputs.dry_run }}" = "true" ]; then
                 echo "  🔸 DRY RUN: Would create kreolact/$target"
               else
-                # Get visibility and description from VR-Cargo repo
                 visibility=$(gh repo view "VR-Cargo/$repo" --json visibility --jq '.visibility' | tr '[:upper:]' '[:lower:]')
                 description=$(gh repo view "VR-Cargo/$repo" --json description --jq '.description // empty')
-                
                 echo "  🔨 Creating kreolact/$target (${visibility})..."
-                
                 if [ -n "$description" ]; then
                   gh repo create "kreolact/$target" --"$visibility" --description "Mirror of VR-Cargo/$repo - $description"
                 else
                   gh repo create "kreolact/$target" --"$visibility" --description "Mirror of VR-Cargo/$repo"
                 fi
-                
                 CREATED_REPOS="$CREATED_REPOS\n  - kreolact/$target"
                 echo "  ✅ Created kreolact/$target"
               fi
             fi
             
-            # Check if repo is empty (no default branch)
+            # Check if repo is empty
             DEFAULT_BRANCH=$(gh repo view "VR-Cargo/$repo" --json defaultBranchRef --jq '.defaultBranchRef.name // empty')
             if [ -z "$DEFAULT_BRANCH" ]; then
-              echo "  ⏭️  VR-Cargo/$repo is empty - skipping mirror.yml (will be added on first push)"
+              echo "  ⏭️  VR-Cargo/$repo is empty - skipping mirror.yml"
               SKIPPED_EMPTY="$SKIPPED_EMPTY\n  - VR-Cargo/$repo"
               continue
             fi
             
-            # Check if VR-Cargo repo has mirror workflow
+            # Check/add mirror workflow
             if ! gh api "repos/VR-Cargo/$repo/contents/.github/workflows/mirror.yml" &>/dev/null; then
               echo "  ⚠️  VR-Cargo/$repo missing mirror.yml"
-              
               if [ "${{ inputs.dry_run }}" = "true" ]; then
-                echo "  🔸 DRY RUN: Would add mirror.yml to VR-Cargo/$repo"
+                echo "  🔸 DRY RUN: Would add mirror.yml"
               else
                 echo "  🔨 Adding mirror.yml to VR-Cargo/$repo..."
                 
-                # Create the mirror workflow content (properly escaped)
-                read -r -d '' WORKFLOW_CONTENT << 'MIRROR_EOF' || true
+                # Generate workflow content with repo name substituted
+                WORKFLOW=$(cat << WFEOF
 # Mirror this repo to kreolact organization
 name: Mirror to kreolact
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - '**'
+    branches: [main]
+    tags: ['**']
 
 jobs:
   mirror:
-    name: Mirror to kreolact/REPO_NAME_PLACEHOLDER
+    name: Mirror to kreolact/${repo}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (full history)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
-
-      - name: Push mirror to kreolact
+      - name: Push mirror
         env:
-          PAT: ${{ secrets.KREOLACT_MIRROR_PAT }}
+          PAT: \${{ secrets.KREOLACT_MIRROR_PAT }}
         run: |
           git config --global user.email "mirror@vr-cargo.com"
           git config --global user.name "VR-Cargo Mirror"
-          git remote add kreolact "https://${PAT}@github.com/kreolact/REPO_NAME_PLACEHOLDER.git"
+          git remote add kreolact "https://\${PAT}@github.com/kreolact/${repo}.git"
           git push kreolact --all --force
           git push kreolact --tags --force
-          echo "✅ Successfully mirrored to kreolact/REPO_NAME_PLACEHOLDER"
-MIRROR_EOF
+WFEOF
+)
                 
-                # Replace placeholder with actual repo name
-                WORKFLOW_CONTENT="${WORKFLOW_CONTENT//REPO_NAME_PLACEHOLDER/$repo}"
+                ENCODED=$(echo "$WORKFLOW" | base64 -w 0)
                 
-                # Base64 encode the content
-                ENCODED_CONTENT=$(echo "$WORKFLOW_CONTENT" | base64 -w 0)
-                
-                # Create the file via GitHub API
                 if gh api "repos/VR-Cargo/$repo/contents/.github/workflows/mirror.yml" \
                   -X PUT \
-                  -f message="feat: Add mirror workflow for kreolact sync
-
-🤖 Generated by VR-Cargo repo sync
-
-Co-Authored-By: VR-Cargo Bot <bot@vr-cargo.com>" \
-                  -f content="$ENCODED_CONTENT" \
+                  -f message="feat: Add mirror workflow for kreolact sync" \
+                  -f content="$ENCODED" \
                   -f branch="$DEFAULT_BRANCH" \
                   --silent 2>/dev/null; then
-                    ADDED_WORKFLOWS="$ADDED_WORKFLOWS\n  - VR-Cargo/$repo"
-                    echo "  ✅ Added mirror.yml to VR-Cargo/$repo"
+                  ADDED_WORKFLOWS="$ADDED_WORKFLOWS\n  - VR-Cargo/$repo"
+                  echo "  ✅ Added mirror.yml"
                 else
-                    echo "  ❌ Failed to add mirror.yml (branch protection may require PR)"
+                  echo "  ❌ Failed to add mirror.yml"
                 fi
               fi
             fi
           done
           
-          # Handle .github repo separately (maps to vr-cargo-github)
+          # Handle .github repo
           echo ""
           echo "📦 Processing .github -> vr-cargo-github"
           if gh repo view "kreolact/vr-cargo-github" &>/dev/null; then
@@ -170,24 +145,14 @@ Co-Authored-By: VR-Cargo Bot <bot@vr-cargo.com>" \
           echo "================================"
           
           if [ -n "$CREATED_REPOS" ]; then
-            echo ""
-            echo "✨ Created repos in kreolact:"
-            echo -e "$CREATED_REPOS"
+            echo -e "\n✨ Created repos:$CREATED_REPOS"
           fi
-          
           if [ -n "$ADDED_WORKFLOWS" ]; then
-            echo ""
-            echo "✨ Added mirror.yml to:"
-            echo -e "$ADDED_WORKFLOWS"
+            echo -e "\n✨ Added mirror.yml:$ADDED_WORKFLOWS"
           fi
-          
           if [ -n "$SKIPPED_EMPTY" ]; then
-            echo ""
-            echo "⏭️  Skipped empty repos (add mirror.yml manually after first commit):"
-            echo -e "$SKIPPED_EMPTY"
+            echo -e "\n⏭️ Skipped empty repos:$SKIPPED_EMPTY"
           fi
-          
           if [ -z "$CREATED_REPOS" ] && [ -z "$ADDED_WORKFLOWS" ] && [ -z "$SKIPPED_EMPTY" ]; then
-            echo ""
-            echo "✅ All repos are synced and have mirror workflows!"
+            echo -e "\n✅ All repos synced!"
           fi
