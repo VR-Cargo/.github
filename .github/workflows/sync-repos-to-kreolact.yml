@@ -1,0 +1,117 @@
+# Automatically sync VR-Cargo repos to kreolact
+# - Creates missing repos in kreolact
+# - Reports repos that need mirror workflows added
+
+name: Sync Repos to kreolact
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no changes)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  sync:
+    name: Sync repositories
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync repos to kreolact
+        env:
+          GH_TOKEN: ${{ secrets.KREOLACT_MIRROR_PAT }}
+        run: |
+          echo "🔍 Checking VR-Cargo repos..."
+          
+          # Get all VR-Cargo repos (excluding .github which maps to vr-cargo-github)
+          VR_CARGO_REPOS=$(gh repo list VR-Cargo --json name,visibility --jq '.[] | select(.name != ".github") | .name')
+          
+          # Mapping for special repo names
+          declare -A REPO_MAP
+          REPO_MAP[".github"]="vr-cargo-github"
+          
+          CREATED_REPOS=""
+          MISSING_WORKFLOWS=""
+          
+          for repo in $VR_CARGO_REPOS; do
+            # Get target name (use mapping if exists)
+            target="${REPO_MAP[$repo]:-$repo}"
+            
+            echo ""
+            echo "📦 Checking $repo -> kreolact/$target"
+            
+            # Check if kreolact repo exists
+            if gh repo view "kreolact/$target" &>/dev/null; then
+              echo "  ✅ kreolact/$target exists"
+            else
+              echo "  ⚠️  kreolact/$target does not exist"
+              
+              if [ "${{ inputs.dry_run }}" = "true" ]; then
+                echo "  🔸 DRY RUN: Would create kreolact/$target"
+              else
+                # Get visibility from VR-Cargo repo
+                visibility=$(gh repo view "VR-Cargo/$repo" --json visibility --jq '.visibility' | tr '[:upper:]' '[:lower:]')
+                
+                # Get description from VR-Cargo repo
+                description=$(gh repo view "VR-Cargo/$repo" --json description --jq '.description // empty')
+                
+                echo "  🔨 Creating kreolact/$target (${visibility})..."
+                
+                if [ -n "$description" ]; then
+                  gh repo create "kreolact/$target" --"$visibility" --description "Mirror of VR-Cargo/$repo - $description"
+                else
+                  gh repo create "kreolact/$target" --"$visibility" --description "Mirror of VR-Cargo/$repo"
+                fi
+                
+                CREATED_REPOS="$CREATED_REPOS\n- kreolact/$target (mirror of VR-Cargo/$repo)"
+                echo "  ✅ Created kreolact/$target"
+              fi
+            fi
+            
+            # Check if VR-Cargo repo has mirror workflow
+            if ! gh api "repos/VR-Cargo/$repo/contents/.github/workflows/mirror.yml" &>/dev/null; then
+              echo "  ⚠️  VR-Cargo/$repo missing mirror.yml workflow"
+              MISSING_WORKFLOWS="$MISSING_WORKFLOWS\n- VR-Cargo/$repo"
+            fi
+          done
+          
+          # Also check .github repo separately
+          echo ""
+          echo "📦 Checking .github -> kreolact/vr-cargo-github"
+          if gh repo view "kreolact/vr-cargo-github" &>/dev/null; then
+            echo "  ✅ kreolact/vr-cargo-github exists"
+          else
+            echo "  ⚠️  kreolact/vr-cargo-github does not exist"
+            if [ "${{ inputs.dry_run }}" != "true" ]; then
+              gh repo create "kreolact/vr-cargo-github" --private --description "Mirror of VR-Cargo/.github"
+              CREATED_REPOS="$CREATED_REPOS\n- kreolact/vr-cargo-github (mirror of VR-Cargo/.github)"
+            fi
+          fi
+          
+          echo ""
+          echo "================================"
+          echo "📊 SUMMARY"
+          echo "================================"
+          
+          if [ -n "$CREATED_REPOS" ]; then
+            echo ""
+            echo "✨ Created repos:"
+            echo -e "$CREATED_REPOS"
+          fi
+          
+          if [ -n "$MISSING_WORKFLOWS" ]; then
+            echo ""
+            echo "⚠️  Repos missing mirror.yml workflow:"
+            echo -e "$MISSING_WORKFLOWS"
+            echo ""
+            echo "Add mirror.yml to these repos to enable automatic mirroring."
+          fi
+          
+          if [ -z "$CREATED_REPOS" ] && [ -z "$MISSING_WORKFLOWS" ]; then
+            echo ""
+            echo "✅ All repos are synced and have mirror workflows!"
+          fi
