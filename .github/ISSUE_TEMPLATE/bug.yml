@@ -76,12 +76,17 @@ body:
         - Transactions
         - Weighbridge Operations
         - Security Checkpoints
+        - Induction (asset onboarding)
+        - Sites (configuration)
+        - Companies (multi-tenant)
+        - Dashboards (Mine/LC/Transporter)
         - Admin/Settings
-        - API
         - UI/UX
-        - Notifications
         - PDF Generation
+        - Notifications
+        - API
         - Authentication/Permissions
+        - MFA
         - Other
     validations:
       required: true
