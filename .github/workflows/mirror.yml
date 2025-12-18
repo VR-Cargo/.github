@@ -1,6 +1,4 @@
 # Mirror this repo to kreolact organization
-# Triggers on every push to main branch
-
 name: Mirror to kreolact
 
 on:
@@ -12,8 +10,23 @@ on:
 
 jobs:
   mirror:
-    uses: VR-Cargo/.github/.github/workflows/mirror-to-kreolact.yml@main
-    with:
-      target_repo: vr-cargo-github
-    secrets:
-      KREOLACT_MIRROR_PAT: ${{ secrets.KREOLACT_MIRROR_PAT }}
+    name: Mirror to kreolact/vr-cargo-github
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Push mirror to kreolact
+        env:
+          PAT: ${{ secrets.KREOLACT_MIRROR_PAT }}
+        run: |
+          git config --global user.email "mirror@vr-cargo.com"
+          git config --global user.name "VR-Cargo Mirror"
+          git remote add kreolact "https://${PAT}@github.com/kreolact/vr-cargo-github.git"
+          git push kreolact --all --force
+          git push kreolact --tags --force
+          echo "✅ Successfully mirrored to kreolact/vr-cargo-github"
