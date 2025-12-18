@@ -51,15 +51,14 @@ body:
       required: true
 
   - type: dropdown
-    id: severity
+    id: priority
     attributes:
-      label: Severity
-      description: How severe is this bug?
+      label: Priority
+      description: How urgent is this bug fix?
       options:
-        - Low (minor inconvenience)
-        - Medium (feature partially broken)
-        - High (feature completely broken)
-        - Critical (system down)
+        - Normal
+        - High
+        - Critical
     validations:
       required: true
 

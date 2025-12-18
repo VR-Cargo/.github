@@ -29,6 +29,18 @@ body:
       required: true
 
   - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature?
+      options:
+        - Normal
+        - High
+        - Critical
+    validations:
+      required: true
+
+  - type: dropdown
     id: affected-area
     attributes:
       label: Affected Area
@@ -66,18 +78,6 @@ body:
         - LoadPlanWeb
         - LoadPlanAndroid
         - LoadPlanNotificationsServer
-    validations:
-      required: true
-
-  - type: dropdown
-    id: priority
-    attributes:
-      label: Priority
-      description: How important is this feature?
-      options:
-        - P0 - Normal (next sprint)
-        - P1 - High (same day)
-        - P2 - Critical (immediate)
     validations:
       required: true
 
