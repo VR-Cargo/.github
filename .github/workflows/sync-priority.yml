@@ -27,29 +27,14 @@ jobs:
           script: |
             const body = `${{ inputs.issue_body }}`;
 
-            // Parse feature template priority
-            // NOTE: Priority scale is inverted intentionally per team preference:
-            // P0 = Normal (default/lowest), P1 = High, P2 = Critical (highest)
-            const featurePriorityMatch = body.match(/### Priority\s*\n\s*(P[0-2]\s*-\s*\w+)/i);
-
-            // Parse bug template severity
-            const severityMatch = body.match(/### Severity\s*\n\s*(Critical|High|Medium|Low)/i);
+            // Parse priority from issue body (both bug and feature templates)
+            // Looks for: ### Priority\n\nNormal|High|Critical
+            const priorityMatch = body.match(/### Priority\s*\n\s*(Normal|High|Critical)/i);
 
             let priority = null;
 
-            if (featurePriorityMatch) {
-              const priorityText = featurePriorityMatch[1].toLowerCase();
-              // P0 = Normal, P1 = High, P2 = Critical
-              if (priorityText.includes('p0')) priority = 'P0';
-              else if (priorityText.includes('p1')) priority = 'P1';
-              else if (priorityText.includes('p2')) priority = 'P2';
-            } else if (severityMatch) {
-              const severity = severityMatch[1].toLowerCase();
-              // Map bug severity to project priority
-              // Low/Medium → P0 (Normal), High → P1, Critical → P2
-              if (severity === 'low' || severity === 'medium') priority = 'P0';
-              else if (severity === 'high') priority = 'P1';
-              else if (severity === 'critical') priority = 'P2';
+            if (priorityMatch) {
+              priority = priorityMatch[1]; // Normal, High, or Critical
             }
 
             console.log(`Parsed priority: ${priority}`);
@@ -103,19 +88,31 @@ jobs:
               return;
             }
 
-            // Find the option ID for the parsed priority
-            const option = priorityField.options.find(opt =>
-              opt.name.toUpperCase().startsWith(priority)
-            );
+            // Map Normal/High/Critical to project field emoji option names
+            const priorityMapping = {
+              'Normal': '🟢 Normal',
+              'High': '🟡 High',
+              'Critical': '🔴 Critical'
+            };
+
+            const targetOptionName = priorityMapping[priority];
+            if (!targetOptionName) {
+              console.log(`Unknown priority: ${priority}`);
+              return;
+            }
+
+            // Find the option ID for the mapped priority name
+            const option = priorityField.options.find(opt => opt.name === targetOptionName);
 
             if (!option) {
-              console.log(`Priority option ${priority} not found in project field`);
+              console.log(`Priority option "${targetOptionName}" not found in project field`);
               console.log('Available options:', priorityField.options.map(o => o.name));
               return;
             }
 
+            console.log(`Mapping ${priority} -> ${targetOptionName} (option ID: ${option.id})`);
+
             // Query the issue directly to get its project items
-            // This is more efficient than searching through all project items
             const issueItemsQuery = `
               query($issueId: ID!) {
                 node(id: $issueId) {
@@ -134,32 +131,56 @@ jobs:
             `;
 
             let projectItem = null;
-            const maxRetries = 10;
+            const maxRetries = 5;
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
-              const issueData = await github.graphql(issueItemsQuery, {
+              console.log(`Attempt ${attempt}/${maxRetries}: Searching for issue in project...`);
+
+              const result = await github.graphql(issueItemsQuery, {
                 issueId: issueNodeId
               });
 
-              // Find the project item that matches our project
-              const matchingItem = issueData.node.projectItems.nodes.find(
-                item => item.project.id === project.id
-              );
+              const items = result.node?.projectItems?.nodes || [];
+              projectItem = items.find(item => item.project.id === project.id);
 
-              if (matchingItem) {
-                projectItem = matchingItem;
+              if (projectItem) {
+                console.log(`Found issue in project! Item ID: ${projectItem.id}`);
                 break;
               }
 
               if (attempt < maxRetries) {
-                console.log(`Issue not in project yet, retrying in 5s (attempt ${attempt}/${maxRetries})`);
-                await new Promise(r => setTimeout(r, 5000));
+                console.log(`Issue not in project yet, waiting 10s...`);
+                await new Promise(r => setTimeout(r, 10000));
               }
             }
 
             if (!projectItem) {
-              console.log('Issue not found in project after all retries. GitHub automation may be slow or disabled.');
-              return;
+              console.log('Issue not found in project after retries. Attempting to add...');
+
+              const addItemMutation = `
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: {
+                    projectId: $projectId
+                    contentId: $contentId
+                  }) {
+                    item {
+                      id
+                    }
+                  }
+                }
+              `;
+
+              try {
+                const addResult = await github.graphql(addItemMutation, {
+                  projectId: project.id,
+                  contentId: issueNodeId
+                });
+                projectItem = addResult.addProjectV2ItemById.item;
+                console.log(`Added issue to project. Item ID: ${projectItem.id}`);
+              } catch (error) {
+                console.log(`Failed to add issue to project: ${error.message}`);
+                return;
+              }
             }
 
             // Update the priority field
@@ -187,4 +208,4 @@ jobs:
               optionId: option.id
             });
 
-            console.log(`Successfully set priority to ${priority} (${option.name})`);
+            console.log(`Successfully set priority to ${priority} (${targetOptionName})`);
