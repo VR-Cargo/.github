@@ -12,6 +12,7 @@ jobs:
   mirror:
     name: Mirror to kreolact/vr-cargo-github
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'VR-Cargo'
     steps:
       - name: Checkout (full history)
         uses: actions/checkout@v4
@@ -26,7 +27,14 @@ jobs:
         run: |
           git config --global user.email "mirror@vr-cargo.com"
           git config --global user.name "VR-Cargo Mirror"
+
+          # Remove .github/workflows before mirroring (kreolact manages its own CI)
+          git rm -rf .github/workflows
+          git commit -m "Mirror: Remove workflows (kreolact manages its own CI)"
+
           git remote add kreolact "https://${PAT}@github.com/kreolact/vr-cargo-github.git"
+
           git push kreolact --all --force
           git push kreolact --tags --force
-          echo "✅ Successfully mirrored to kreolact/vr-cargo-github"
+
+          echo "✅ Successfully mirrored to kreolact/vr-cargo-github (workflows excluded)"
