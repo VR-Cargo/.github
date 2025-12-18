@@ -109,3 +109,6 @@ jobs:
           [ -n "$ADDED_WORKFLOWS" ] && echo -e "\n✨ Added mirror.yml to:$ADDED_WORKFLOWS"
           [ -n "$SKIPPED_EMPTY" ] && echo -e "\n⏭️ Skipped empty repos:$SKIPPED_EMPTY"
           [ -z "$CREATED_REPOS$ADDED_WORKFLOWS$SKIPPED_EMPTY" ] && echo -e "\n✅ All repos synced and have mirror workflows!"
+
+          echo ""
+          echo "Sync complete!"
