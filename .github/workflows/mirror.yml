@@ -28,9 +28,9 @@ jobs:
           git config --global user.email "mirror@vr-cargo.com"
           git config --global user.name "VR-Cargo Mirror"
 
-          # Remove .github/workflows before mirroring (kreolact manages its own CI)
-          git rm -rf .github/workflows
-          git commit -m "Mirror: Remove workflows (kreolact manages its own CI)"
+          # Remove .github folder before mirroring (kreolact manages its own CI, templates, etc.)
+          git rm -rf .github
+          git commit -m "Mirror: Remove .github (kreolact manages its own config)"
 
           git remote add kreolact "https://${PAT}@github.com/kreolact/vr-cargo-github.git"
 
