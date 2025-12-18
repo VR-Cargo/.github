@@ -1,0 +1,168 @@
+name: Sync Project Fields (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      issue_title:
+        description: 'Issue title'
+        required: true
+        type: string
+      issue_node_id:
+        description: 'Issue node ID'
+        required: true
+        type: string
+      repo_name:
+        description: 'Repository name'
+        required: true
+        type: string
+    secrets:
+      CROSS_REPO_PAT:
+        description: 'GitHub token with project write permissions'
+        required: true
+
+jobs:
+  sync-fields:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for project auto-add
+        run: sleep 15
+
+      - name: Sync Type and Platform to Project
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CROSS_REPO_PAT }}
+          script: |
+            const title = `${{ inputs.issue_title }}`;
+            const repo = '${{ inputs.repo_name }}';
+            const issueNodeId = '${{ inputs.issue_node_id }}';
+
+            console.log(`Processing: ${title}`);
+            console.log(`Repository: ${repo}`);
+
+            // Project and field IDs
+            const PROJECT_ID = "PVT_kwDODYLoIc4BIvMy";
+            const TYPE_FIELD = "PVTSSF_lADODYLoIc4BIvMyzg6n-Rc";
+            const PLATFORM_FIELD = "PVTSSF_lADODYLoIc4BIvMyzg6n-S0";
+
+            // Option IDs for Issue Type
+            const typeOptions = {
+              feature: "52baad59",
+              bug: "52be2590",
+              refactor: "40871d11",
+              docs: "1a246f66",
+              chore: "21fa36ae"
+            };
+
+            // Option IDs for Platform
+            const platformOptions = {
+              loadplan_web: "6bb7950c",
+              loadplan_android: "dd7243d2",
+              loadplan_notifications_server: "d48b852b"
+            };
+
+            // Determine type from title prefix
+            let typeId = null;
+            const lowerTitle = title.toLowerCase();
+            if (lowerTitle.startsWith('[feature]')) {
+              typeId = typeOptions.feature;
+            } else if (lowerTitle.startsWith('[bug]')) {
+              typeId = typeOptions.bug;
+            } else if (lowerTitle.startsWith('[refactor]')) {
+              typeId = typeOptions.refactor;
+            } else if (lowerTitle.startsWith('[docs]')) {
+              typeId = typeOptions.docs;
+            } else if (lowerTitle.startsWith('[chore]')) {
+              typeId = typeOptions.chore;
+            }
+
+            // Determine platform from repository
+            const platformId = platformOptions[repo];
+
+            if (!typeId && !platformId) {
+              console.log('No type or platform to set');
+              return;
+            }
+
+            // Find the project item for this issue
+            const findItemQuery = `
+              query($issueId: ID!) {
+                node(id: $issueId) {
+                  ... on Issue {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project { id }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            let projectItem = null;
+            const maxRetries = 10;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              const result = await github.graphql(findItemQuery, { issueId: issueNodeId });
+              const items = result.node?.projectItems?.nodes || [];
+              projectItem = items.find(item => item.project.id === PROJECT_ID);
+
+              if (projectItem) {
+                console.log(`Found project item: ${projectItem.id}`);
+                break;
+              }
+
+              if (attempt < maxRetries) {
+                console.log(`Issue not in project yet, waiting 5s (attempt ${attempt}/${maxRetries})`);
+                await new Promise(r => setTimeout(r, 5000));
+              }
+            }
+
+            if (!projectItem) {
+              console.log('Issue not found in project after retries');
+              return;
+            }
+
+            // Update Type field
+            if (typeId) {
+              const updateType = `
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }) { projectV2Item { id } }
+                }
+              `;
+              await github.graphql(updateType, {
+                projectId: PROJECT_ID,
+                itemId: projectItem.id,
+                fieldId: TYPE_FIELD,
+                optionId: typeId
+              });
+              console.log(`Set Issue Type`);
+            }
+
+            // Update Platform field
+            if (platformId) {
+              const updatePlatform = `
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }) { projectV2Item { id } }
+                }
+              `;
+              await github.graphql(updatePlatform, {
+                projectId: PROJECT_ID,
+                itemId: projectItem.id,
+                fieldId: PLATFORM_FIELD,
+                optionId: platformId
+              });
+              console.log(`Set Platform`);
+            }
+
+            console.log('Done!');

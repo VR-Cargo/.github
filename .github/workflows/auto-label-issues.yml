@@ -1,12 +1,20 @@
-name: Auto-Label Issues
+name: Auto-Label Issues (Reusable)
 
 on:
-  issues:
-    types: [opened, edited]
-
-permissions:
-  issues: write
-  contents: read
+  workflow_call:
+    inputs:
+      issue_number:
+        description: 'Issue number'
+        required: true
+        type: number
+      issue_body:
+        description: 'Issue body content'
+        required: true
+        type: string
+      repo_name:
+        description: 'Repository name'
+        required: true
+        type: string
 
 jobs:
   auto-label:
@@ -16,46 +24,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const issue = context.payload.issue;
-            const title = issue.title || '';
-            const body = issue.body || '';
-            const repo = context.repo.repo;
+            const issueNumber = ${{ inputs.issue_number }};
+            const body = `${{ inputs.issue_body }}`;
+            const repoName = '${{ inputs.repo_name }}';
             const labelsToAdd = [];
 
-            console.log(`Processing issue #${issue.number}: ${title}`);
-            console.log(`Repository: ${repo}`);
+            console.log(`Processing issue #${issueNumber} in ${repoName}`);
 
-            // === TYPE LABELS (from title prefix) ===
-            if (title.startsWith('[Bug]') || title.startsWith('[bug]')) {
-              labelsToAdd.push('bug');
-            } else if (title.startsWith('[Feature]') || title.startsWith('[feature]')) {
-              labelsToAdd.push('enhancement');
-            } else if (title.startsWith('[Refactor]') || title.startsWith('[refactor]')) {
-              labelsToAdd.push('refactor');
-            } else if (title.startsWith('[Docs]') || title.startsWith('[docs]')) {
-              labelsToAdd.push('documentation');
-            } else if (title.startsWith('[Chore]') || title.startsWith('[chore]')) {
-              labelsToAdd.push('chore');
-            }
-
-            // === PRIORITY LABELS (from body) ===
-            // Feature template: ### Priority\n\nP0 - Normal
-            const priorityMatch = body.match(/### Priority\s*\n\s*(P[0-2])/i);
-            if (priorityMatch) {
-              const priority = priorityMatch[1].toUpperCase();
-              if (priority === 'P0') labelsToAdd.push('P0: normal');
-              else if (priority === 'P1') labelsToAdd.push('P1: high');
-              else if (priority === 'P2') labelsToAdd.push('P2: critical');
-            }
-
-            // Bug template: ### Severity\n\nCritical
-            const severityMatch = body.match(/### Severity\s*\n\s*(Critical|High|Medium|Low)/i);
-            if (severityMatch) {
-              const severity = severityMatch[1].toLowerCase();
-              if (severity === 'critical') labelsToAdd.push('P2: critical');
-              else if (severity === 'high') labelsToAdd.push('P1: high');
-              else labelsToAdd.push('P0: normal');
-            }
+            // NOTE: Type and Platform are set as Project Fields, not labels
+            // Only Area labels are added here
 
             // === AREA LABELS (from body) ===
             const areaMatch = body.match(/### Affected Area[s]?\s*\n\s*([^\n#]+)/i);
@@ -63,34 +40,34 @@ jobs:
               const areas = areaMatch[1].split(',').map(a => a.trim().toLowerCase());
 
               const areaMapping = {
-                'assets': 'area: assets',
-                'assets (trucks/trailers/drivers)': 'area: assets',
-                'orders': 'area: orders',
-                'pre-bookings': 'area: pre-bookings',
-                'transactions': 'area: transactions',
-                'weighbridge operations': 'area: weighbridge',
-                'weighbridge': 'area: weighbridge',
-                'security checkpoints': 'area: security',
-                'security': 'area: security',
-                'induction': 'area: induction',
-                'induction (asset onboarding)': 'area: induction',
-                'sites': 'area: sites',
-                'sites (configuration)': 'area: sites',
-                'companies': 'area: companies',
-                'companies (multi-tenant)': 'area: companies',
-                'dashboards': 'area: dashboards',
-                'dashboards (mine/lc/transporter)': 'area: dashboards',
-                'admin/settings': 'area: admin',
-                'admin': 'area: admin',
-                'ui/ux': 'area: ui',
-                'ui': 'area: ui',
-                'pdf generation': 'area: pdf',
-                'pdf': 'area: pdf',
-                'notifications': 'area: notifications',
-                'api': 'area: api',
-                'authentication/permissions': 'area: auth',
-                'auth': 'area: auth',
-                'mfa': 'area: mfa'
+                'assets': '🚛 Assets',
+                'assets (trucks/trailers/drivers)': '🚛 Assets',
+                'orders': '📦 Orders',
+                'pre-bookings': '📅 Pre-bookings',
+                'transactions': '💳 Transactions',
+                'weighbridge operations': '⚖️ Weighbridge',
+                'weighbridge': '⚖️ Weighbridge',
+                'security checkpoints': '🔒 Security',
+                'security': '🔒 Security',
+                'induction': '📋 Induction',
+                'induction (asset onboarding)': '📋 Induction',
+                'sites': '📍 Sites',
+                'sites (configuration)': '📍 Sites',
+                'companies': '🏢 Companies',
+                'companies (multi-tenant)': '🏢 Companies',
+                'dashboards': '📊 Dashboards',
+                'dashboards (mine/lc/transporter)': '📊 Dashboards',
+                'admin/settings': '⚙️ Admin',
+                'admin': '⚙️ Admin',
+                'ui/ux': '🎨 UI',
+                'ui': '🎨 UI',
+                'pdf generation': '📄 PDF',
+                'pdf': '📄 PDF',
+                'notifications': '🔔 Notifications',
+                'api': '🔌 API',
+                'authentication/permissions': '🔐 Auth',
+                'auth': '🔐 Auth',
+                'mfa': '📲 MFA'
               };
 
               for (const area of areas) {
@@ -101,36 +78,27 @@ jobs:
               }
             }
 
-            // === REPO LABELS (from repository name) ===
-            if (repo === 'loadplan_web') {
-              labelsToAdd.push('repo: web');
-            } else if (repo === 'loadplan_android') {
-              labelsToAdd.push('repo: android');
-            } else if (repo === 'loadplan_notifications_server') {
-              labelsToAdd.push('repo: server');
-            }
-
             // === APPLY LABELS ===
             if (labelsToAdd.length > 0) {
-              console.log(`Adding labels: ${labelsToAdd.join(', ')}`);
+              console.log(`Adding area labels: ${labelsToAdd.join(', ')}`);
 
               try {
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  issue_number: issue.number,
+                  issue_number: issueNumber,
                   labels: labelsToAdd
                 });
                 console.log('Labels added successfully');
               } catch (error) {
                 console.log(`Error adding labels: ${error.message}`);
-                // Some labels might not exist, try adding one by one
+                // Try one by one
                 for (const label of labelsToAdd) {
                   try {
                     await github.rest.issues.addLabels({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
-                      issue_number: issue.number,
+                      issue_number: issueNumber,
                       labels: [label]
                     });
                     console.log(`Added label: ${label}`);
@@ -140,5 +108,5 @@ jobs:
                 }
               }
             } else {
-              console.log('No labels to add');
+              console.log('No area labels to add');
             }

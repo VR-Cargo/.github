@@ -1,40 +1,43 @@
-# Mirror this repo to kreolact organization
-name: Mirror to kreolact
+name: Mirror to kreolact (Reusable)
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - '**'
+  workflow_call:
+    inputs:
+      source_repo:
+        description: 'Source repository name (e.g., loadplan_web)'
+        required: true
+        type: string
+      target_repo:
+        description: 'Target repository in kreolact org'
+        required: true
+        type: string
+    secrets:
+      KREOLACT_MIRROR_PAT:
+        description: 'PAT with write access to kreolact repos'
+        required: true
 
 jobs:
   mirror:
-    name: Mirror to kreolact/vr-cargo-github
-    runs-on: ubuntu-latest
+    # Only run in VR-Cargo org (not when mirrored to kreolact)
     if: github.repository_owner == 'VR-Cargo'
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout (full history)
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          fetch-tags: true
-          persist-credentials: false
 
-      - name: Push mirror to kreolact
+      - name: Remove .github folder and push to kreolact
         env:
           PAT: ${{ secrets.KREOLACT_MIRROR_PAT }}
         run: |
-          git config --global user.email "mirror@vr-cargo.com"
-          git config --global user.name "VR-Cargo Mirror"
-
-          # Remove .github folder before mirroring (kreolact manages its own CI, templates, etc.)
+          # Configure git
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Remove .github folder (workflows, templates, etc.)
           git rm -rf .github
-          git commit -m "Mirror: Remove .github (kreolact manages its own config)"
-
-          git remote add kreolact "https://${PAT}@github.com/kreolact/vr-cargo-github.git"
-
-          git push kreolact --all --force
-          git push kreolact --tags --force
-
-          echo "✅ Successfully mirrored to kreolact/vr-cargo-github (workflows excluded)"
+          git commit -m "chore: Remove .github folder for kreolact mirror"
+          
+          # Push to kreolact
+          git push --force "https://${PAT}@github.com/kreolact/${{ inputs.target_repo }}.git" HEAD:main
