@@ -22,11 +22,16 @@ jobs:
     steps:
       - name: Auto-label issue
         uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          ISSUE_BODY: ${{ inputs.issue_body }}
+          REPO_NAME: ${{ inputs.repo_name }}
         with:
           script: |
-            const issueNumber = ${{ inputs.issue_number }};
-            const body = `${{ inputs.issue_body }}`;
-            const repoName = '${{ inputs.repo_name }}';
+            // Use environment variables to safely handle special characters in issue body
+            const issueNumber = parseInt(process.env.ISSUE_NUMBER, 10);
+            const body = process.env.ISSUE_BODY || '';
+            const repoName = process.env.REPO_NAME;
             const labelsToAdd = [];
 
             console.log(`Processing issue #${issueNumber} in ${repoName}`);

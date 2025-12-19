@@ -23,9 +23,12 @@ jobs:
       - name: Parse Priority from Issue Body
         id: parse
         uses: actions/github-script@v7
+        env:
+          ISSUE_BODY: ${{ inputs.issue_body }}
         with:
           script: |
-            const body = `${{ inputs.issue_body }}`;
+            // Use environment variable to safely handle special characters in issue body
+            const body = process.env.ISSUE_BODY || '';
 
             // Parse priority from issue body (both bug and feature templates)
             // Looks for: ### Priority\n\nNormal|High|Critical
@@ -48,11 +51,14 @@ jobs:
       - name: Update Project Priority
         if: steps.parse.outputs.priority != ''
         uses: actions/github-script@v7
+        env:
+          ISSUE_NODE_ID: ${{ inputs.issue_node_id }}
+          PRIORITY: ${{ steps.parse.outputs.priority }}
         with:
           github-token: ${{ secrets.CROSS_REPO_PAT }}
           script: |
-            const priority = '${{ steps.parse.outputs.priority }}';
-            const issueNodeId = `${{ inputs.issue_node_id }}`;
+            const priority = process.env.PRIORITY;
+            const issueNodeId = process.env.ISSUE_NODE_ID;
 
             // Get the project and field info
             // VR-Cargo MVP Project number is 1
