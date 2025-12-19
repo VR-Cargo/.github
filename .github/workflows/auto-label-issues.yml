@@ -15,6 +15,10 @@ on:
         description: 'Repository name'
         required: true
         type: string
+    secrets:
+      CROSS_REPO_PAT:
+        description: 'GitHub token with issues write permissions'
+        required: true
 
 jobs:
   auto-label:
@@ -27,6 +31,7 @@ jobs:
           ISSUE_BODY: ${{ inputs.issue_body }}
           REPO_NAME: ${{ inputs.repo_name }}
         with:
+          github-token: ${{ secrets.CROSS_REPO_PAT }}
           script: |
             // Use environment variables to safely handle special characters in issue body
             const issueNumber = parseInt(process.env.ISSUE_NUMBER, 10);
