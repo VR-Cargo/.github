@@ -1,7 +1,7 @@
 # Automatically sync VR-Cargo repos to kreolact
 # - Creates missing repos in kreolact  
 # - Adds mirror.yml workflow directly to repos (org admins bypass branch protection)
-# Updated: 2025-12-18
+# Updated: 2026-02-02
 
 name: Sync Repos to kreolact
 
@@ -50,9 +50,16 @@ jobs:
                 visibility=$(gh repo view "VR-Cargo/$repo" --json visibility --jq '.visibility' | tr '[:upper:]' '[:lower:]')
                 description=$(gh repo view "VR-Cargo/$repo" --json description --jq '.description // empty')
                 echo "  🔨 Creating kreolact/$repo..."
-                gh repo create "kreolact/$repo" --"$visibility" --description "Mirror of VR-Cargo/$repo${description:+ - $description}"
-                CREATED_REPOS="$CREATED_REPOS\n  - kreolact/$repo"
-                echo "  ✅ Created"
+                if gh repo create "kreolact/$repo" --"$visibility" --description "Mirror of VR-Cargo/$repo${description:+ - $description}" 2>&1; then
+                  CREATED_REPOS="$CREATED_REPOS\n  - kreolact/$repo"
+                  echo "  ✅ Created"
+                elif gh repo view "kreolact/$repo" &>/dev/null; then
+                  # Race condition: repo exists now (GitHub API eventual consistency)
+                  echo "  ✅ kreolact/$repo already exists (API lag)"
+                else
+                  echo "  ❌ Failed to create kreolact/$repo"
+                  exit 1
+                fi
               fi
             else
               echo "  ✅ kreolact/$repo exists"
@@ -96,7 +103,16 @@ jobs:
           echo ""
           echo "📦 Processing .github -> vr-cargo-github"
           if ! gh repo view "kreolact/vr-cargo-github" &>/dev/null; then
-            [ "${{ inputs.dry_run }}" != "true" ] && gh repo create "kreolact/vr-cargo-github" --private --description "Mirror of VR-Cargo/.github"
+            if [ "${{ inputs.dry_run }}" != "true" ]; then
+              if gh repo create "kreolact/vr-cargo-github" --private --description "Mirror of VR-Cargo/.github" 2>&1; then
+                echo "  ✅ Created"
+              elif gh repo view "kreolact/vr-cargo-github" &>/dev/null; then
+                echo "  ✅ already exists (API lag)"
+              else
+                echo "  ❌ Failed to create"
+                exit 1
+              fi
+            fi
           else
             echo "  ✅ exists"
           fi
