@@ -1,0 +1,43 @@
+name: Mirror to kreolact (Reusable)
+
+# Reusable workflow that mirrors the calling VR-Cargo repo to the
+# same-named repo in the kreolact org. Strips .github so the mirror
+# doesn't try to run these workflows on the kreolact side.
+#
+# Callers invoke this as:
+#   jobs:
+#     mirror:
+#       uses: VR-Cargo/.github/.github/workflows/mirror-to-kreolact.yml@main
+#       secrets: inherit
+
+on:
+  workflow_call:
+
+jobs:
+  mirror:
+    if: github.repository_owner == 'VR-Cargo'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Mirror to kreolact/${{ github.event.repository.name }}
+        env:
+          GH_TOKEN: ${{ secrets.KREOLACT_MIRROR_PAT }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          if [ -d .github ]; then
+            git rm -rf .github
+            git commit -m "chore: strip .github for kreolact mirror"
+          fi
+
+          git config --global credential.helper store
+          echo "https://x-access-token:${GH_TOKEN}@github.com" > ~/.git-credentials
+
+          git remote add kreolact "https://github.com/kreolact/${{ github.event.repository.name }}.git"
+          git push --force kreolact HEAD:main
