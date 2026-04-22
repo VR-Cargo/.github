@@ -17,7 +17,19 @@ on:
         type: boolean
 
 env:
-  MIRROR_TEMPLATE: bmFtZTogTWlycm9yIHRvIGtyZW9sYWN0CgpvbjoKICBwdXNoOgogICAgYnJhbmNoZXM6IFttYWluXQogIHdvcmtmbG93X2Rpc3BhdGNoOgoKam9iczoKICBtaXJyb3I6CiAgICBpZjogZ2l0aHViLnJlcG9zaXRvcnlfb3duZXIgPT0gJ1ZSLUNhcmdvJwogICAgcnVucy1vbjogdWJ1bnR1LWxhdGVzdAogICAgc3RlcHM6CiAgICAgIC0gbmFtZTogQ2hlY2tvdXQgc291cmNlCiAgICAgICAgdXNlczogYWN0aW9ucy9jaGVja291dEB2NAogICAgICAgIHdpdGg6CiAgICAgICAgICBmZXRjaC1kZXB0aDogMAogICAgICAgICAgcGVyc2lzdC1jcmVkZW50aWFsczogZmFsc2UKCiAgICAgIC0gbmFtZTogUmVtb3ZlIC5naXRodWIgYW5kIG1pcnJvciB0byBrcmVvbGFjdAogICAgICAgIGVudjoKICAgICAgICAgIEdIX1RPS0VOOiAke3sgc2VjcmV0cy5DUk9TU19SRVBPX1BBVCB9fQogICAgICAgIHJ1bjogfAogICAgICAgICAgIyBDb25maWd1cmUgZ2l0CiAgICAgICAgICBnaXQgY29uZmlnIHVzZXIubmFtZSAiR2l0SHViIEFjdGlvbnMiCiAgICAgICAgICBnaXQgY29uZmlnIHVzZXIuZW1haWwgImFjdGlvbnNAZ2l0aHViLmNvbSIKICAgICAgICAgIAogICAgICAgICAgIyBSZW1vdmUgLmdpdGh1YiBmb2xkZXIKICAgICAgICAgIGdpdCBybSAtcmYgLmdpdGh1YgogICAgICAgICAgZ2l0IGNvbW1pdCAtbSAiY2hvcmU6IFJlbW92ZSAuZ2l0aHViIGZvbGRlciBmb3Iga3Jlb2xhY3QgbWlycm9yIgogICAgICAgICAgCiAgICAgICAgICAjIFNldCB1cCBjcmVkZW50aWFsIGhlbHBlciB0byB1c2Ugb3VyIHRva2VuCiAgICAgICAgICBnaXQgY29uZmlnIC0tZ2xvYmFsIGNyZWRlbnRpYWwuaGVscGVyIHN0b3JlCiAgICAgICAgICBlY2hvICJodHRwczovL3gtYWNjZXNzLXRva2VuOiR7R0hfVE9LRU59QGdpdGh1Yi5jb20iID4gfi8uZ2l0LWNyZWRlbnRpYWxzCiAgICAgICAgICAKICAgICAgICAgICMgQWRkIHJlbW90ZSBhbmQgcHVzaAogICAgICAgICAgZ2l0IHJlbW90ZSBhZGQga3Jlb2xhY3QgImh0dHBzOi8vZ2l0aHViLmNvbS9rcmVvbGFjdC9SRVBPX1BMQUNFSE9MREVSLmdpdCIKICAgICAgICAgIGdpdCBwdXNoIC0tZm9yY2Uga3Jlb2xhY3QgSEVBRDptYWluCg==
+  # Thin wrapper that delegates to the reusable mirror-to-kreolact.yml
+  # workflow in this repo. Decoded:
+  #
+  #   name: Mirror to kreolact
+  #   on:
+  #     push:
+  #       branches: [main]
+  #     workflow_dispatch:
+  #   jobs:
+  #     mirror:
+  #       uses: VR-Cargo/.github/.github/workflows/mirror-to-kreolact.yml@main
+  #       secrets: inherit
+  MIRROR_TEMPLATE: bmFtZTogTWlycm9yIHRvIGtyZW9sYWN0CgpvbjoKICBwdXNoOgogICAgYnJhbmNoZXM6IFttYWluXQogIHdvcmtmbG93X2Rpc3BhdGNoOgoKam9iczoKICBtaXJyb3I6CiAgICB1c2VzOiBWUi1DYXJnby8uZ2l0aHViLy5naXRodWIvd29ya2Zsb3dzL21pcnJvci10by1rcmVvbGFjdC55bWxAbWFpbgogICAgc2VjcmV0czogaW5oZXJpdAo=
 
 jobs:
   sync:
@@ -80,8 +92,9 @@ jobs:
               if [ "${{ inputs.dry_run }}" != "true" ]; then
                 echo "  🔨 Adding mirror.yml directly..."
 
-                # Decode template and replace placeholder
-                CONTENT=$(echo "$MIRROR_TEMPLATE" | base64 -d | sed "s/REPO_PLACEHOLDER/$repo/g" | base64)
+                # Decode template — the wrapper uses github context at runtime,
+                # no per-repo substitution needed
+                CONTENT="$MIRROR_TEMPLATE"
 
                 # Create the workflow file directly on default branch (org admin bypass)
                 if gh api "repos/VR-Cargo/$repo/contents/.github/workflows/mirror.yml" \
@@ -98,24 +111,6 @@ jobs:
               fi
             fi
           done
-
-          # .github repo
-          echo ""
-          echo "📦 Processing .github -> vr-cargo-github"
-          if ! gh repo view "kreolact/vr-cargo-github" &>/dev/null; then
-            if [ "${{ inputs.dry_run }}" != "true" ]; then
-              if gh repo create "kreolact/vr-cargo-github" --private --description "Mirror of VR-Cargo/.github" 2>&1; then
-                echo "  ✅ Created"
-              elif gh repo view "kreolact/vr-cargo-github" &>/dev/null; then
-                echo "  ✅ already exists (API lag)"
-              else
-                echo "  ❌ Failed to create"
-                exit 1
-              fi
-            fi
-          else
-            echo "  ✅ exists"
-          fi
 
           echo ""
           echo "========================================"
