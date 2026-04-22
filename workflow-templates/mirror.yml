@@ -1,19 +1,33 @@
-# Mirror this repo to kreolact organization
-# Triggers on every push to any branch
-
 name: Mirror to kreolact
 
 on:
   push:
-    branches:
-      - '**'  # All branches
-    tags:
-      - '**'  # All tags
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   mirror:
-    uses: VR-Cargo/.github/.github/workflows/mirror-to-kreolact.yml@main
-    with:
-      target_repo: $default-branch  # Replace with actual repo name
-    secrets:
-      KREOLACT_MIRROR_PAT: ${{ secrets.KREOLACT_MIRROR_PAT }}
+    if: github.repository_owner == 'VR-Cargo'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Remove .github and mirror to kreolact
+        env:
+          GH_TOKEN: ${{ secrets.KREOLACT_MIRROR_PAT }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git rm -rf .github
+          git commit -m "chore: Remove .github folder for kreolact mirror"
+
+          git config --global credential.helper store
+          echo "https://x-access-token:${GH_TOKEN}@github.com" > ~/.git-credentials
+
+          git remote add kreolact "https://github.com/kreolact/${{ github.event.repository.name }}.git"
+          git push --force kreolact HEAD:main
